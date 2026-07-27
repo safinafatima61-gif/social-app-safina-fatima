@@ -1,8 +1,8 @@
 {
   "version": 2,
   "framework": null,
-  "installCommand": "cd social-app && npm install",
-  "buildCommand": "cd social-app && npm run build",
+  "installCommand": "npm --prefix social-app install",
+  "buildCommand": "npm --prefix social-app run build",
   "outputDirectory": "social-app/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

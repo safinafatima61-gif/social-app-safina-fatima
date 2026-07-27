@@ -2,9 +2,9 @@ import OpenAI from 'openai';
 
 /**
  * Single OpenAI client for the whole app.
- * Key only in social-app/.env — never commit:
- *   VITE_OPENAI_API_KEY=sk-your-key-here
- * Restart `npm run dev` after changing .env.
+ * Local: social-app/.env → VITE_OPENAI_API_KEY (never commit)
+ * Vercel: Project → Settings → Environment Variables → VITE_OPENAI_API_KEY
+ * Vite inlines the key at build time — redeploy after changing Vercel env.
  */
 const apiKey = String(import.meta.env.VITE_OPENAI_API_KEY || '')
   .trim()
@@ -24,10 +24,10 @@ export function formatOpenAIError(err) {
   const msg = String(err?.message || err || 'AI request failed');
 
   if (!isOpenAIConfigured()) {
-    return 'OpenAI key missing. Add VITE_OPENAI_API_KEY in social-app/.env and restart npm run dev.';
+    return 'OpenAI key missing. Local: set VITE_OPENAI_API_KEY in social-app/.env and restart. Deployed: add it in Vercel Environment Variables and redeploy.';
   }
   if (status === 401 || /incorrect api key|invalid api key|unauthorized|authentication/i.test(msg)) {
-    return 'Invalid OpenAI API key. Update VITE_OPENAI_API_KEY in .env and restart npm run dev.';
+    return 'Invalid OpenAI API key. Update VITE_OPENAI_API_KEY (local .env or Vercel env) and restart/redeploy.';
   }
   if (status === 429 || /rate limit/i.test(msg)) {
     return 'OpenAI rate limit — wait a moment and try again.';

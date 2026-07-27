@@ -4,19 +4,14 @@ A frontend-only social media app built with React — sign up, post, like, comme
 
 ## 1. Live Demo
 
-> Deploy to [Vercel](https://vercel.com) or [Netlify](https://netlify.com) and put your live link here:
-> **Live Demo:** https://connect-circle-919.lovable.app/auth
+> **GitHub:** https://github.com/safinafatima61-gif/social-app-safina-fatima/tree/assignment-2  
+> **Live Demo (Vercel):** https://social-app-safina-fatima.vercel.app  
+> AI key: local `.env` or Vercel Environment Variable `VITE_OPENAI_API_KEY` (never commit `.env`)
 
 ## 2. Screenshots
 
 > Add at least 4 screenshots here after running the app locally or visiting the live demo: Feed page, Create Post, Profile page, Dashboard.
 >
-> `![Feed](./screenshots/feed.png)`
-> `![Create Post](./screenshots/create-post.png)`
-> `![Profile](./screenshots/profile.png)`
-> `![Dashboard](./screenshots/dashboard.png)`
-
-## 3. Tech Stack
 
 - **React (Vite)** — frontend framework and build tool
 - **React Router v6** — routing, dynamic routes, protected routes
@@ -188,8 +183,7 @@ A modern Facebook-inspired social media application built with **React (Vite)**.
 **Live Demo:** https://connect-circle-919.lovable.app/auth
 
 
-**Live Demo vercel:**  
-
+**Live Demo (Vercel):** https://social-app-safina-fatima.vercel.app
 
 # 📸 Screenshots
 ![alt text](Feedpage.png)

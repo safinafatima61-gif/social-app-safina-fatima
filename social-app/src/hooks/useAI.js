@@ -109,7 +109,7 @@ export function useAI(userId) {
         }
         if (!isOpenAIConfigured()) {
           setError(
-            'OpenAI key missing. Add VITE_OPENAI_API_KEY in social-app/.env and restart npm run dev.'
+            'OpenAI key missing. Local: social-app/.env. Deployed: Vercel Environment Variables. Then restart/redeploy.'
           );
           return emptyValue;
         }
