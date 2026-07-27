@@ -7,7 +7,8 @@ A frontend-only social networking app built with React (Vite). Assignment 1 cove
 
 ## 1. Live Demo
 
-> **Live Demo (Vercel):** _will be updated after deployment_  
+> **GitHub branch:** https://github.com/safinafatima61-gif/social-app-safina-fatima/tree/assignment-2  
+> **Live Demo (Vercel):** connect this repo in Vercel with Root Directory `social-app` (see Deployment below)  
 > Previous demo: https://connect-circle-919.lovable.app/auth
 
 ## 2. Screenshots
