@@ -1,59 +1,75 @@
 import { storage } from '../services/storage';
-import { areFriends } from './friendHelpers';
+import { areFriends, getFriendIds, resolveUser } from './friendHelpers';
+
+function normId(id) {
+  return id == null ? '' : String(id);
+}
 
 /** Always sort IDs so A→B and B→A share the same conversation */
 export function getConversationId(userId1, userId2) {
-  return [userId1, userId2].sort().join('_');
+  return [normId(userId1), normId(userId2)].filter(Boolean).sort().join('_');
 }
 
 /** Messages between two users, oldest → newest */
 export function getMessages(userId1, userId2) {
-  const conversationId = getConversationId(userId1, userId2);
+  const a = normId(userId1);
+  const b = normId(userId2);
+  if (!a || !b) return [];
+  const conversationId = getConversationId(a, b);
+
   return storage
     .getMessages()
-    .filter((m) => m.conversationId === conversationId)
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    .filter((m) => {
+      if (!m) return false;
+      if (normId(m.conversationId) === conversationId) return true;
+      // Fallback: match by participant pair (fixes bad/legacy conversationId)
+      const participants = [normId(m.senderId), normId(m.receiverId)].sort().join('_');
+      return participants === conversationId;
+    })
+    .sort((x, y) => new Date(x.timestamp) - new Date(y.timestamp));
 }
 
-/** Conversation list for a user (friends only), most recent first */
+/**
+ * Conversation list — accepted friends only.
+ * Friends with no messages still appear (so Message → /chat/:id works).
+ * Sorted by most recent message first.
+ */
 export function getConversations(userId) {
-  const users = storage.getUsers();
+  const uid = normId(userId);
+  if (!uid) return [];
+
   const messages = storage.getMessages();
-  const friendIds = new Set(
-    users
-      .filter((u) => u.id !== userId && areFriends(userId, u.id))
-      .map((u) => u.id)
-  );
+  const friendIds = getFriendIds(uid);
 
   const byFriend = {};
+  friendIds.forEach((friendId) => {
+    byFriend[friendId] = { lastMessage: null, unread: 0 };
+  });
 
   messages.forEach((msg) => {
-    if (msg.senderId !== userId && msg.receiverId !== userId) return;
-    const friendId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-    if (!friendIds.has(friendId)) return;
+    const sender = normId(msg.senderId);
+    const receiver = normId(msg.receiverId);
+    if (sender !== uid && receiver !== uid) return;
 
-    if (!byFriend[friendId]) {
-      byFriend[friendId] = { lastMessage: msg, unread: 0 };
-    } else if (new Date(msg.timestamp) > new Date(byFriend[friendId].lastMessage.timestamp)) {
+    const friendId = sender === uid ? receiver : sender;
+    if (!byFriend[friendId]) return; // not an accepted friend — skip
+
+    if (
+      !byFriend[friendId].lastMessage ||
+      new Date(msg.timestamp) > new Date(byFriend[friendId].lastMessage.timestamp)
+    ) {
       byFriend[friendId].lastMessage = msg;
     }
 
-    if (msg.receiverId === userId && !msg.read) {
+    if (receiver === uid && !msg.read) {
       byFriend[friendId].unread += 1;
-    }
-  });
-
-  // Include friends with no messages yet so they still appear after Message click
-  friendIds.forEach((friendId) => {
-    if (!byFriend[friendId]) {
-      byFriend[friendId] = { lastMessage: null, unread: 0 };
     }
   });
 
   return Object.entries(byFriend)
     .map(([friendId, data]) => ({
       friendId,
-      friend: users.find((u) => u.id === friendId),
+      friend: resolveUser(friendId),
       lastMessage: data.lastMessage,
       unread: data.unread,
     }))
@@ -65,29 +81,43 @@ export function getConversations(userId) {
     });
 }
 
-/** Total unread messages for navbar badge */
+/** Total unread from accepted friends only (navbar badge) */
 export function getUnreadMessageCount(userId) {
+  const uid = normId(userId);
+  if (!uid) return 0;
+  const friendIds = new Set(getFriendIds(uid));
   return storage
     .getMessages()
-    .filter((m) => m.receiverId === userId && !m.read).length;
+    .filter(
+      (m) =>
+        normId(m.receiverId) === uid &&
+        !m.read &&
+        friendIds.has(normId(m.senderId))
+    ).length;
 }
 
 /** Mark all messages in a conversation as read for the receiver */
 export function markConversationRead(currentUserId, friendId) {
-  const conversationId = getConversationId(currentUserId, friendId);
+  const me = normId(currentUserId);
+  const other = normId(friendId);
+  if (!me || !other) return storage.getMessages();
+
+  const conversationId = getConversationId(me, other);
   const messages = storage.getMessages();
   let changed = false;
+
   const next = messages.map((m) => {
-    if (
-      m.conversationId === conversationId &&
-      m.receiverId === currentUserId &&
-      !m.read
-    ) {
+    const sameThread =
+      normId(m.conversationId) === conversationId ||
+      [normId(m.senderId), normId(m.receiverId)].sort().join('_') === conversationId;
+
+    if (sameThread && normId(m.receiverId) === me && !m.read) {
       changed = true;
       return { ...m, read: true };
     }
     return m;
   });
+
   if (changed) storage.setMessages(next);
   return next;
 }
@@ -106,3 +136,5 @@ export function messagePreview(message, max = 40) {
   const text = message.content || '';
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
+
+export { areFriends };

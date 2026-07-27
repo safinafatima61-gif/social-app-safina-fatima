@@ -8,7 +8,7 @@ import { storage } from '../../services/storage';
 import { useAuth } from '../../hooks/useAuth';
 import { useFriends } from '../../hooks/useFriends';
 import { useToast } from '../../context/ToastContext';
-import { getFriendsOf, getMutualFriendsCount } from '../../utils/friendHelpers';
+import { getMutualFriendsCount } from '../../utils/friendHelpers';
 
 const BIO_MAX = 150;
 
@@ -19,13 +19,12 @@ export default function ProfileHeader({ user, isOwner }) {
   const {
     getRelationship,
     sendRequest,
-    acceptRequest,
-    rejectRequest,
-    cancelRequest,
+    acceptRequestFromUser,
+    rejectRequestFromUser,
+    cancelRequestToUser,
     unfriend,
-    received,
-    sent,
     friendsCount,
+    getFriendsCountFor,
   } = useFriends(currentUser?.id);
 
   const avatarInputRef = useRef(null);
@@ -44,9 +43,10 @@ export default function ProfileHeader({ user, isOwner }) {
   const postsCount = storage
     .getPosts()
     .filter((p) => p.authorId === user.id && !p.isDraft && p.isPublic).length;
-  const profileFriendsCount = getFriendsOf(user.id).length;
+  const profileFriendsCount = getFriendsCountFor(user.id);
   const mutualCount =
     currentUser && !isOwner ? getMutualFriendsCount(currentUser.id, user.id) : 0;
+  const displayFriendsCount = isOwner ? friendsCount : profileFriendsCount;
 
   const skills = Array.isArray(user.skills)
     ? user.skills
@@ -80,24 +80,25 @@ export default function ProfileHeader({ user, isOwner }) {
   }
 
   function handleAccept() {
-    const req = received.find((r) => r.fromUserId === user.id);
-    if (req) {
-      acceptRequest(req.id);
+    const result = acceptRequestFromUser(user.id);
+    if (result?.ok) {
       toast('Friend request accepted', 'success');
+      navigate('/friends');
+    } else {
+      toast('Could not accept request', 'error');
     }
   }
 
   function handleReject() {
-    const req = received.find((r) => r.fromUserId === user.id);
-    if (req) rejectRequest(req.id);
+    const result = rejectRequestFromUser(user.id);
+    if (result?.ok) toast('Request rejected');
+    else toast('Could not reject request', 'error');
   }
 
   function handleCancel() {
-    const req = sent.find((r) => r.toUserId === user.id);
-    if (req) {
-      cancelRequest(req.id);
-      toast('Request cancelled');
-    }
+    const result = cancelRequestToUser(user.id);
+    if (result?.ok) toast('Request cancelled');
+    else toast('Could not cancel request', 'error');
   }
 
   return (
@@ -192,8 +193,14 @@ export default function ProfileHeader({ user, isOwner }) {
               <Button
                 size="sm"
                 onClick={() => {
-                  sendRequest(user.id);
-                  toast('Friend request sent', 'success');
+                  const result = sendRequest(user.id);
+                  if (result?.acceptedExisting) {
+                    toast('They already requested you — now friends!', 'success');
+                  } else if (result?.ok) {
+                    toast('Friend request sent', 'success');
+                  } else {
+                    toast('Could not send request', 'error');
+                  }
                 }}
               >
                 Add Friend
@@ -228,8 +235,8 @@ export default function ProfileHeader({ user, isOwner }) {
                   size="sm"
                   variant="secondary"
                   onClick={() => {
-                    unfriend(user.id);
-                    toast('Unfriended');
+                    const result = unfriend(user.id);
+                    if (result?.ok) toast('Unfriended');
                   }}
                 >
                   Unfriend
@@ -251,7 +258,7 @@ export default function ProfileHeader({ user, isOwner }) {
           </div>
           <div className="rounded-xl bg-slate-50 px-3 py-2 text-center dark:bg-slate-800/60">
             <p className="text-lg font-bold text-slate-900 dark:text-slate-50">
-              {isOwner ? friendsCount : profileFriendsCount}
+              {displayFriendsCount}
             </p>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Friends</p>
           </div>

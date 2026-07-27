@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { storage, generateId } from '../services/storage';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -19,14 +27,17 @@ export function ChatProvider({ children }) {
   const { currentUser } = useAuth();
   const currentUserId = currentUser?.id || null;
 
-  const [conversations, setConversations] = useState(() =>
-    currentUserId ? getConversations(currentUserId) : []
-  );
-  const [unreadCount, setUnreadCount] = useState(() =>
-    currentUserId ? getUnreadMessageCount(currentUserId) : 0
-  );
+  const [conversations, setConversations] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const writingRef = useRef(false);
+  const activeFriendRef = useRef(null);
+
+  // Keep a ref so storage handlers always see the open thread
+  useEffect(() => {
+    activeFriendRef.current = activeFriendId;
+  }, [activeFriendId]);
 
   const refreshConversations = useCallback(() => {
     if (!currentUserId) {
@@ -38,23 +49,28 @@ export function ChatProvider({ children }) {
     setUnreadCount(getUnreadMessageCount(currentUserId));
   }, [currentUserId]);
 
-  const refreshMessages = useCallback(() => {
-    if (!currentUserId || !activeFriendId) {
-      setMessages([]);
-      return;
-    }
-    setMessages(getMessages(currentUserId, activeFriendId));
-  }, [currentUserId, activeFriendId]);
+  const refreshMessages = useCallback(
+    (friendId = activeFriendRef.current) => {
+      if (!currentUserId || !friendId) {
+        setMessages([]);
+        return;
+      }
+      setMessages(getMessages(currentUserId, friendId));
+    },
+    [currentUserId]
+  );
 
   const refreshAll = useCallback(() => {
     refreshConversations();
-    refreshMessages();
+    refreshMessages(activeFriendRef.current);
   }, [refreshConversations, refreshMessages]);
 
+  // Load when user logs in / changes
   useEffect(() => {
     refreshAll();
   }, [currentUserId, refreshAll]);
 
+  // Real-time: native storage (other tabs) + app-storage (same-tab writes)
   useEffect(() => {
     function handleStorage(event) {
       if (event.key === 'messages' || event.key === 'friendRequests') {
@@ -63,7 +79,8 @@ export function ChatProvider({ children }) {
     }
     function handleAppStorage(event) {
       const key = event.detail?.key;
-      if (key === 'messages' || key === 'friendRequests' || key === 'users') {
+      if (key === 'messages' || key === 'friendRequests') {
+        if (writingRef.current && key === 'messages') return;
         refreshAll();
       }
     }
@@ -75,20 +92,34 @@ export function ChatProvider({ children }) {
     };
   }, [refreshAll]);
 
+  // Open a conversation: load messages + mark read
   useEffect(() => {
-    if (!currentUserId || !activeFriendId) return;
+    if (!currentUserId || !activeFriendId) {
+      setMessages([]);
+      return;
+    }
+    if (!areFriends(currentUserId, activeFriendId)) {
+      setMessages([]);
+      return;
+    }
+    setMessages(getMessages(currentUserId, activeFriendId));
     markConversationRead(currentUserId, activeFriendId);
-    refreshAll();
-  }, [currentUserId, activeFriendId, refreshAll]);
+    refreshConversations();
+  }, [currentUserId, activeFriendId, refreshConversations]);
 
-  // Online presence placeholder (lastSeen heartbeat)
+  // Presence heartbeat — silent write (no app-storage)
   useEffect(() => {
     if (!currentUserId) return;
     const touch = () => {
-      const next = storage.getUsers().map((u) =>
-        u.id === currentUserId ? { ...u, lastSeen: new Date().toISOString() } : u
-      );
-      storage.setUsers(next);
+      try {
+        const users = storage.getUsers();
+        const next = users.map((u) =>
+          u.id === currentUserId ? { ...u, lastSeen: new Date().toISOString() } : u
+        );
+        localStorage.setItem('users', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
     };
     touch();
     const interval = setInterval(touch, 60_000);
@@ -97,7 +128,9 @@ export function ChatProvider({ children }) {
 
   const sendMessage = useCallback(
     ({ receiverId, type = 'text', content, aiGenerated = false }) => {
-      if (!currentUserId || !receiverId || !content) return null;
+      if (!currentUserId || !receiverId || content == null || content === '') {
+        return null;
+      }
       if (!areFriends(currentUserId, receiverId)) {
         throw new Error('You can only message friends');
       }
@@ -107,7 +140,7 @@ export function ChatProvider({ children }) {
         conversationId: getConversationId(currentUserId, receiverId),
         senderId: currentUserId,
         receiverId,
-        type,
+        type: type || 'text',
         content,
         timestamp: new Date().toISOString(),
         read: false,
@@ -115,7 +148,20 @@ export function ChatProvider({ children }) {
         reactions: [],
       };
 
-      storage.setMessages([...storage.getMessages(), message]);
+      writingRef.current = true;
+      try {
+        storage.setMessages([...storage.getMessages(), message]);
+      } finally {
+        queueMicrotask(() => {
+          writingRef.current = false;
+        });
+      }
+
+      // Update open thread immediately for the sender
+      if (String(activeFriendRef.current) === String(receiverId)) {
+        setMessages(getMessages(currentUserId, receiverId));
+      }
+      refreshConversations();
 
       const sender = storage.getUsers().find((u) => u.id === currentUserId);
       createNotification({
@@ -126,34 +172,41 @@ export function ChatProvider({ children }) {
         link: `/chat/${currentUserId}`,
       });
 
-      if (activeFriendId === receiverId) {
-        setMessages(getMessages(currentUserId, receiverId));
-      }
-      refreshConversations();
       return message;
     },
-    [currentUserId, activeFriendId, refreshConversations]
+    [currentUserId, refreshConversations]
   );
 
   const toggleReaction = useCallback(
     (messageId, emoji) => {
       if (!currentUserId) return;
-      const next = storage.getMessages().map((m) => {
-        if (m.id !== messageId) return m;
-        const reactions = Array.isArray(m.reactions) ? [...m.reactions] : [];
-        const existing = reactions.find(
-          (r) => r.emoji === emoji && r.userId === currentUserId
-        );
-        const updated = existing
-          ? reactions.filter((r) => !(r.emoji === emoji && r.userId === currentUserId))
-          : [...reactions, { emoji, userId: currentUserId }];
-        return { ...m, reactions: updated };
-      });
-      storage.setMessages(next);
-      refreshMessages();
+      writingRef.current = true;
+      try {
+        const next = storage.getMessages().map((m) => {
+          if (m.id !== messageId) return m;
+          const reactions = Array.isArray(m.reactions) ? [...m.reactions] : [];
+          const existing = reactions.find(
+            (r) => r.emoji === emoji && r.userId === currentUserId
+          );
+          const updated = existing
+            ? reactions.filter((r) => !(r.emoji === emoji && r.userId === currentUserId))
+            : [...reactions, { emoji, userId: currentUserId }];
+          return { ...m, reactions: updated };
+        });
+        storage.setMessages(next);
+      } finally {
+        queueMicrotask(() => {
+          writingRef.current = false;
+        });
+      }
+      refreshMessages(activeFriendRef.current);
     },
     [currentUserId, refreshMessages]
   );
+
+  const openConversation = useCallback((friendId) => {
+    setActiveFriendId(friendId ? String(friendId) : null);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -161,7 +214,7 @@ export function ChatProvider({ children }) {
       unreadCount,
       messages,
       activeFriendId,
-      setActiveFriendId,
+      setActiveFriendId: openConversation,
       refreshAll,
       refreshConversations,
       refreshMessages,
@@ -177,6 +230,7 @@ export function ChatProvider({ children }) {
       unreadCount,
       messages,
       activeFriendId,
+      openConversation,
       refreshAll,
       refreshConversations,
       refreshMessages,

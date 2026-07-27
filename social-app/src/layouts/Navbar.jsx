@@ -65,6 +65,12 @@ export default function Navbar() {
                 </NavLink>
               )}
 
+              <NavLink to="/dashboard/create" className={textLinkClass}>
+                Create
+              </NavLink>
+              <NavLink to="/dashboard/settings" className={textLinkClass}>
+                Settings
+              </NavLink>
               <NavLink to="/people" className={textLinkClass}>
                 People
               </NavLink>

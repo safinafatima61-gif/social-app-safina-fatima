@@ -8,15 +8,15 @@ import Button from '../components/ui/Button';
 
 function FriendsContent() {
   const { currentUser } = useAuth();
-  const { friends, friendsCount, unfriend } = useFriends(currentUser.id);
+  const { friends, friendsCount, unfriend } = useFriends();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const message = location.state?.message;
 
   function handleUnfriend(id) {
-    unfriend(id);
-    toast('Removed from friends');
+    const result = unfriend(id);
+    if (result?.ok) toast('Removed from friends');
   }
 
   return (

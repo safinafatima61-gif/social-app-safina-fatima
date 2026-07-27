@@ -5,6 +5,7 @@ import { readFileAsBase64 } from '../../utils/helpers';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import { PhotoIcon, CloseIcon } from '../icons/Icons';
+import AIPostAssistant from '../ai/AIPostAssistant';
 
 export default function CreatePostComposer() {
   const { currentUser } = useAuth();
@@ -46,6 +47,10 @@ export default function CreatePostComposer() {
 
   return (
     <form onSubmit={handleSubmit} className="card overflow-hidden">
+      <div className="border-b border-slate-100 px-4 pt-4 dark:border-slate-800">
+        <AIPostAssistant onUseContent={(content) => setText(content)} />
+      </div>
+
       <div className="flex gap-3 p-4">
         <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
         <textarea

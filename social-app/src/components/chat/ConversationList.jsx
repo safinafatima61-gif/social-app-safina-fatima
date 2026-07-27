@@ -15,7 +15,7 @@ export default function ConversationList({ conversations, activeFriendId, onSele
         <ConversationItem
           key={c.friendId}
           conversation={c}
-          active={c.friendId === activeFriendId}
+          active={String(c.friendId) === String(activeFriendId || '')}
           onClick={() => onSelect(c.friendId)}
         />
       ))}

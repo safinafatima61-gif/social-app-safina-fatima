@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useFriends } from '../hooks/useFriends';
 import { useToast } from '../context/ToastContext';
-import { storage } from '../services/storage';
+import { resolveUserOrPlaceholder } from '../utils/friendHelpers';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
 import RequireAuth from '../components/RequireAuth';
@@ -17,21 +17,27 @@ function FriendRequestsContent() {
     currentUser.id
   );
   const [tab, setTab] = useState('received');
-  const users = storage.getUsers();
 
   function onAccept(reqId) {
-    acceptRequest(reqId);
-    toast('Friend added! Open Friends to message them.', 'success');
+    const result = acceptRequest(reqId);
+    if (result?.ok) {
+      toast('Friend added! Opening Friends…', 'success');
+      navigate('/friends');
+    } else {
+      toast('Could not accept this request. Try again.', 'error');
+    }
   }
 
   function onReject(reqId) {
-    rejectRequest(reqId);
-    toast('Request rejected');
+    const result = rejectRequest(reqId);
+    if (result?.ok) toast('Request rejected');
+    else toast('Could not reject this request.', 'error');
   }
 
   function onCancel(reqId) {
-    cancelRequest(reqId);
-    toast('Request cancelled');
+    const result = cancelRequest(reqId);
+    if (result?.ok) toast('Request cancelled');
+    else toast('Could not cancel this request.', 'error');
   }
 
   return (
@@ -85,8 +91,7 @@ function FriendRequestsContent() {
             </div>
           ) : (
             received.map((req) => {
-              const sender = users.find((u) => u.id === req.fromUserId);
-              if (!sender) return null;
+              const sender = resolveUserOrPlaceholder(req.fromUserId, 'Unknown sender');
               return (
                 <div
                   key={req.id}
@@ -127,8 +132,7 @@ function FriendRequestsContent() {
             </div>
           ) : (
             sent.map((req) => {
-              const receiver = users.find((u) => u.id === req.toUserId);
-              if (!receiver) return null;
+              const receiver = resolveUserOrPlaceholder(req.toUserId, 'Unknown user');
               return (
                 <div
                   key={req.id}

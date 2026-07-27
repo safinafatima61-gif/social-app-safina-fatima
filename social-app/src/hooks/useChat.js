@@ -3,7 +3,10 @@ import { useChatContext } from '../context/ChatContext';
 
 /**
  * Chat state lives in ChatContext.
- * Pass friendId when viewing a specific conversation thread.
+ * Pass friendId when viewing /chat/:userId — opens that conversation.
+ *
+ * Important: do NOT clear activeFriendId in an effect cleanup.
+ * Clearing caused messages to wipe on StrictMode remounts / route transitions.
  */
 export function useChat(_currentUserId, friendId = null) {
   const {
@@ -18,17 +21,18 @@ export function useChat(_currentUserId, friendId = null) {
     isUserOnline,
     messagePreview,
     setActiveFriendId,
+    activeFriendId,
   } = useChatContext();
 
   useEffect(() => {
     setActiveFriendId(friendId || null);
-    return () => setActiveFriendId(null);
   }, [friendId, setActiveFriendId]);
 
   return {
     messages,
     conversations,
     unreadCount,
+    activeFriendId,
     refreshAll,
     sendMessage,
     toggleReaction,

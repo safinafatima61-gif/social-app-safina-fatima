@@ -13,46 +13,53 @@ function PeoplePageContent() {
   const {
     suggestions,
     received,
-    sent,
     sendRequest,
-    acceptRequest,
-    rejectRequest,
-    cancelRequest,
+    acceptRequestFromUser,
+    rejectRequestFromUser,
+    cancelRequestToUser,
     unfriend,
   } = useFriends(currentUser.id);
 
   function handleAccept(userId) {
-    const req = received.find((r) => r.fromUserId === userId);
-    if (req) {
-      acceptRequest(req.id);
-      toast('Accepted — now in Friends list', 'success');
+    const result = acceptRequestFromUser(userId);
+    if (result?.ok) {
+      toast('Accepted — opening Friends', 'success');
+      navigate('/friends');
+    } else {
+      toast('No pending request from this user.', 'error');
     }
   }
 
   function handleReject(userId) {
-    const req = received.find((r) => r.fromUserId === userId);
-    if (req) {
-      rejectRequest(req.id);
-      toast('Request rejected');
-    }
+    const result = rejectRequestFromUser(userId);
+    if (result?.ok) toast('Request rejected');
+    else toast('No pending request from this user.', 'error');
   }
 
   function handleCancel(userId) {
-    const req = sent.find((r) => r.toUserId === userId);
-    if (req) {
-      cancelRequest(req.id);
-      toast('Request cancelled');
-    }
+    const result = cancelRequestToUser(userId);
+    if (result?.ok) toast('Request cancelled');
+    else toast('No pending request to cancel.', 'error');
   }
 
   function handleAdd(userId) {
-    sendRequest(userId);
-    toast('Friend request sent — open Requests in other tab to Accept', 'success');
+    const result = sendRequest(userId);
+    if (result?.acceptedExisting) {
+      toast('They already requested you — now friends!', 'success');
+    } else if (result?.ok) {
+      toast('Friend request sent — open Requests in other tab to Accept', 'success');
+    } else if (result?.reason === 'already_friends') {
+      toast('Already friends');
+    } else if (result?.reason === 'already_sent') {
+      toast('Request already sent');
+    } else {
+      toast('Could not send request.', 'error');
+    }
   }
 
   function handleUnfriend(userId) {
-    unfriend(userId);
-    toast('Removed from friends');
+    const result = unfriend(userId);
+    if (result?.ok) toast('Removed from friends');
   }
 
   const incoming = suggestions.filter((s) => s.relationship === 'incoming');
@@ -84,11 +91,10 @@ function PeoplePageContent() {
           <li>
             Open a <strong>new tab</strong> → Login as{' '}
             <code className="rounded bg-white/70 px-1 dark:bg-slate-900">alex@demo.com</code> /{' '}
-            <code className="rounded bg-white/70 px-1 dark:bg-slate-900">demo123</code> (or{' '}
-            <code className="rounded bg-white/70 px-1 dark:bg-slate-900">sam@demo.com</code>)
+            <code className="rounded bg-white/70 px-1 dark:bg-slate-900">demo123</code>
           </li>
           <li>
-            Here: click <strong>Add Friend</strong> on Alex/Sam
+            Here: click <strong>Add Friend</strong> on Alex
           </li>
           <li>
             Other tab: open <strong>Requests</strong> → Accept
@@ -110,7 +116,7 @@ function PeoplePageContent() {
       {incoming.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Friend requests for you
+            Friend requests for you ({incoming.length})
           </h2>
           <div className="space-y-3">
             {incoming.map(({ user, relationship, mutualCount, hasPosts }) => (
@@ -134,7 +140,7 @@ function PeoplePageContent() {
         </h2>
         {suggestions.length === 0 ? (
           <div className="card p-10 text-center text-slate-400 dark:text-slate-500">
-            No other users yet. Sign up a second account in another tab.
+            No other users yet. Sign up a second account in another tab, or use demo accounts.
           </div>
         ) : (
           <div className="space-y-3">

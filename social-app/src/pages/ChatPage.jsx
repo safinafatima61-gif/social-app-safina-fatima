@@ -13,6 +13,7 @@ import AISuggestionChips from '../components/chat/AISuggestionChips';
 import AIChatBanner from '../components/chat/AIChatBanner';
 import TypingIndicator from '../components/chat/TypingIndicator';
 import Avatar from '../components/ui/Avatar';
+import Button from '../components/ui/Button';
 import clsx from 'clsx';
 
 function ChatPageContent() {
@@ -25,6 +26,7 @@ function ChatPageContent() {
     sendMessage,
     toggleReaction,
     isUserOnline,
+    activeFriendId,
   } = useChat(currentUser.id, friendId || null);
   const {
     settings,
@@ -34,6 +36,7 @@ function ChatPageContent() {
     loading: aiLoading,
     error: aiError,
     setError: setAiError,
+    isConfigured,
   } = useAI(currentUser.id);
 
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
@@ -43,12 +46,17 @@ function ChatPageContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState('');
   const bottomRef = useRef(null);
-  const lastHandledMsgId = useRef(null);
   const autoReplyTimer = useRef(null);
+  const lastAutoRepliedMsgId = useRef(null);
 
   const friend = friendId
-    ? storage.getUsers().find((u) => u.id === friendId)
+    ? storage.getUsers().find((u) => String(u.id) === String(friendId))
     : null;
+
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const lastFromFriend = Boolean(
+    lastMessage && lastMessage.senderId !== currentUser.id
+  );
 
   // Redirect if not friends
   useEffect(() => {
@@ -58,43 +66,65 @@ function ChatPageContent() {
     }
   }, [friendId, currentUser.id, navigate]);
 
+  // Reset AI UI when switching conversations
+  useEffect(() => {
+    setSuggestions([]);
+    setDraft('');
+    lastAutoRepliedMsgId.current = null;
+  }, [friendId]);
+
   // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, suggestions, aiLoading]);
 
-  // Mode 1 suggestions + Mode 2 auto-reply when friend sends a new message
-  useEffect(() => {
-    if (!friendId || !messages.length) return;
-    const last = messages[messages.length - 1];
-    if (last.senderId === currentUser.id) {
-      setSuggestions([]);
-      return;
-    }
-    if (lastHandledMsgId.current === last.id) return;
-    lastHandledMsgId.current = last.id;
-
-    const recent = messages.slice(-5).map((m) => ({
+  async function loadSuggestions(forMessages = messages) {
+    if (!friendId || !forMessages.length) return [];
+    const recent = forMessages.slice(-5).map((m) => ({
       ...m,
       fromSelf: m.senderId === currentUser.id,
     }));
+    const chips = await suggestChatReplies({
+      userName: currentUser.name,
+      friendName: friend?.name || 'Friend',
+      recentMessages: recent,
+    });
+    return chips;
+  }
+
+  // 3D — Mode 1 suggestions (default) + Mode 2 auto-reply (opt-in)
+  useEffect(() => {
+    if (!friendId || !lastMessage) return;
+    if (!lastFromFriend) {
+      setSuggestions([]);
+      return;
+    }
 
     const mode = settings.aiMode || 'suggest';
-
     if (mode === 'off') {
       setSuggestions([]);
       return;
     }
 
+    // Mode 2 — AI replies on user's behalf (must be explicitly enabled)
     if (mode === 'auto' && settings.aiChatEnabled) {
+      if (lastAutoRepliedMsgId.current === lastMessage.id) return;
+      lastAutoRepliedMsgId.current = lastMessage.id;
       setSuggestions([]);
+
       if (autoReplyTimer.current) clearTimeout(autoReplyTimer.current);
+      let cancelled = false;
       autoReplyTimer.current = setTimeout(async () => {
+        const recent = messages.slice(-5).map((m) => ({
+          ...m,
+          fromSelf: m.senderId === currentUser.id,
+        }));
         const reply = await generateAutoReply({
           userName: currentUser.name,
           friendName: friend?.name || 'Friend',
           recentMessages: recent,
         });
+        if (cancelled) return;
         if (reply) {
           try {
             sendMessage({
@@ -109,38 +139,31 @@ function ChatPageContent() {
         } else {
           setToast('AI reply failed — please reply manually');
         }
-      }, 1500);
+      }, 1500); // 1–2s delay to feel natural
+
       return () => {
+        cancelled = true;
         if (autoReplyTimer.current) clearTimeout(autoReplyTimer.current);
       };
     }
 
-    // Mode 1 — suggest only
+    // Mode 1 — 3 reply chips when friend messages (fail silently)
     let cancelled = false;
     (async () => {
-      const chips = await suggestChatReplies({
-        userName: currentUser.name,
-        friendName: friend?.name || 'Friend',
-        recentMessages: recent,
-      });
+      const chips = await loadSuggestions(messages);
       if (!cancelled) setSuggestions(chips);
     })();
 
     return () => {
       cancelled = true;
-      if (autoReplyTimer.current) clearTimeout(autoReplyTimer.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on new last message / mode
   }, [
-    messages,
     friendId,
-    currentUser.id,
-    currentUser.name,
-    friend?.name,
+    lastMessage?.id,
+    lastFromFriend,
     settings.aiMode,
     settings.aiChatEnabled,
-    generateAutoReply,
-    suggestChatReplies,
-    sendMessage,
   ]);
 
   useEffect(() => {
@@ -152,7 +175,7 @@ function ChatPageContent() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(''), 3000);
+    const t = setTimeout(() => setToast(''), 3500);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -179,12 +202,16 @@ function ChatPageContent() {
   const online = friend ? isUserOnline(friend) : false;
 
   function handleSend({ type, content }) {
+    if (!friendId) {
+      setToast('Select a friend to chat with');
+      return;
+    }
     try {
       sendMessage({ receiverId: friendId, type, content, aiGenerated: false });
       setSuggestions([]);
       setDraft('');
     } catch (err) {
-      setToast(err.message);
+      setToast(err.message || 'Failed to send message');
     }
   }
 
@@ -194,11 +221,34 @@ function ChatPageContent() {
       aiChatEnabled: mode === 'auto',
     });
     setAiMenuOpen(false);
+    if (mode === 'suggest') {
+      setToast('AI suggestions enabled');
+    } else if (mode === 'auto') {
+      setToast('AI will reply for you');
+    } else {
+      setToast('AI turned off');
+      setSuggestions([]);
+    }
+  }
+
+  async function handleManualSuggest() {
+    if (!isConfigured) {
+      setToast('OpenAI key missing — check social-app/.env and restart npm run dev');
+      return;
+    }
+    if (!messages.length) {
+      setToast('Send or receive a message first');
+      return;
+    }
+    const chips = await loadSuggestions(messages);
+    setSuggestions(chips);
+    if (!chips.length) {
+      setToast('No suggestions returned — try again');
+    }
   }
 
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      {/* Conversation list */}
       <aside
         className={clsx(
           'w-full border-r border-slate-200 dark:border-slate-800 md:w-80 md:block',
@@ -207,18 +257,20 @@ function ChatPageContent() {
       >
         <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50">Chat</h1>
-          <Link to="/friends" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+          <Link
+            to="/friends"
+            className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+          >
             Friends
           </Link>
         </div>
         <ConversationList
           conversations={conversations}
-          activeFriendId={friendId}
+          activeFriendId={activeFriendId || friendId}
           onSelect={(id) => navigate(`/chat/${id}`)}
         />
       </aside>
 
-      {/* Conversation panel */}
       <section
         className={clsx(
           'flex h-full flex-1 flex-col',
@@ -252,15 +304,26 @@ function ChatPageContent() {
                     <p className="font-bold text-slate-900 dark:text-slate-50">{friend.name}</p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       {online ? 'Online' : 'Offline'}
-                      {settings.aiChatEnabled && settings.aiMode === 'auto'
+                      {settings.aiMode === 'auto' && settings.aiChatEnabled
                         ? ` · AI (${settings.aiPersonality})`
-                        : ''}
+                        : settings.aiMode === 'suggest'
+                          ? ' · AI suggestions on'
+                          : ''}
                     </p>
                   </div>
                 </Link>
               </div>
 
               <div className="relative flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleManualSuggest}
+                  disabled={aiLoading}
+                  className="rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200"
+                  title="Get AI reply suggestions"
+                >
+                  ✨ Suggest
+                </button>
                 <button
                   type="button"
                   onClick={() => setSearchOpen((v) => !v)}
@@ -272,12 +335,17 @@ function ChatPageContent() {
                 <button
                   type="button"
                   onClick={() => setAiMenuOpen((v) => !v)}
-                  className="rounded-lg px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950"
+                  className="rounded-lg border border-blue-400 bg-blue-600 px-2.5 py-1 text-sm font-bold text-white hover:bg-blue-700 dark:border-blue-500"
                 >
                   AI ▾
                 </button>
                 {aiMenuOpen && (
                   <div className="absolute right-0 top-10 z-20 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                    {!isConfigured && (
+                      <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                        API key not loaded — restart npm run dev
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -380,7 +448,7 @@ function ChatPageContent() {
                 );
               })}
 
-              {aiLoading && settings.aiMode === 'auto' && <TypingIndicator />}
+              {aiLoading && <TypingIndicator />}
 
               {suggestions.length > 0 && settings.aiMode !== 'off' && (
                 <AISuggestionChips
@@ -388,6 +456,18 @@ function ChatPageContent() {
                   onSelect={(text) => setDraft(text)}
                 />
               )}
+
+              {!aiLoading &&
+                suggestions.length === 0 &&
+                lastFromFriend &&
+                settings.aiMode === 'suggest' && (
+                  <div className="mt-2 flex justify-center">
+                    <Button size="sm" variant="outline" onClick={handleManualSuggest}>
+                      ✨ Get AI reply suggestions
+                    </Button>
+                  </div>
+                )}
+
               <div ref={bottomRef} />
             </div>
 

@@ -14,31 +14,14 @@ export default function PeopleSidebar() {
   const navigate = useNavigate();
   const {
     suggestions,
-    received,
-    sent,
     sendRequest,
-    acceptRequest,
-    rejectRequest,
-    cancelRequest,
+    acceptRequestFromUser,
+    rejectRequestFromUser,
+    cancelRequestToUser,
     unfriend,
   } = useFriends(currentUser?.id);
 
   const people = suggestions.slice(0, 8);
-
-  function handleAccept(userId) {
-    const req = received.find((r) => r.fromUserId === userId);
-    if (req) acceptRequest(req.id);
-  }
-
-  function handleReject(userId) {
-    const req = received.find((r) => r.fromUserId === userId);
-    if (req) rejectRequest(req.id);
-  }
-
-  function handleCancel(userId) {
-    const req = sent.find((r) => r.toUserId === userId);
-    if (req) cancelRequest(req.id);
-  }
 
   return (
     <SectionCard
@@ -73,11 +56,11 @@ export default function PeopleSidebar() {
                 mutualCount={mutualCount}
                 hasPosts={hasPosts}
                 compact
-                onAdd={sendRequest}
-                onAccept={handleAccept}
-                onReject={handleReject}
-                onCancel={handleCancel}
-                onUnfriend={unfriend}
+                onAdd={(id) => sendRequest(id)}
+                onAccept={(id) => acceptRequestFromUser(id)}
+                onReject={(id) => rejectRequestFromUser(id)}
+                onCancel={(id) => cancelRequestToUser(id)}
+                onUnfriend={(id) => unfriend(id)}
                 onMessage={(id) => navigate(`/chat/${id}`)}
               />
             </li>

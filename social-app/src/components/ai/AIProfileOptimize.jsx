@@ -3,6 +3,7 @@ import Button from '../ui/Button';
 import { useAI } from '../../hooks/useAI';
 import { useAuth } from '../../hooks/useAuth';
 
+/** Optimise bio with AI — Profile Settings */
 export default function AIProfileOptimize({ name, bio, location, onUse }) {
   const { currentUser } = useAuth();
   const { loading, error, optimiseBio, isConfigured } = useAI(currentUser?.id);
@@ -14,7 +15,7 @@ export default function AIProfileOptimize({ name, bio, location, onUse }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950/40">
       <Button
         type="button"
         size="sm"
@@ -22,14 +23,20 @@ export default function AIProfileOptimize({ name, bio, location, onUse }) {
         onClick={handleOptimise}
         isLoading={loading}
         disabled={!isConfigured || loading}
+        className="border-blue-400 text-blue-800 dark:border-blue-600 dark:text-blue-200"
       >
         ✨ Optimise with AI
       </Button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!isConfigured && (
+        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
+          Set VITE_OPENAI_API_KEY in social-app/.env and restart npm run dev.
+        </p>
+      )}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       {suggestion && (
-        <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-3 dark:border-brand-900 dark:bg-brand-950/50">
-          <p className="text-xs font-semibold text-brand-700 dark:text-brand-300">Suggested bio:</p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{suggestion}</p>
+        <div className="mt-3 rounded-xl border border-blue-200 bg-white p-3 dark:border-blue-800 dark:bg-slate-900">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Suggested bio:</p>
+          <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{suggestion}</p>
           <Button size="sm" className="mt-2" onClick={() => onUse?.(suggestion)}>
             Use Suggestion
           </Button>
