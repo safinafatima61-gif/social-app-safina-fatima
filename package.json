@@ -1,0 +1,10 @@
+{
+  "name": "social-app-safina-fatima",
+  "private": true,
+  "description": "Root helper for Vercel — app lives in social-app/",
+  "scripts": {
+    "dev": "npm --prefix social-app run dev",
+    "build": "npm --prefix social-app run build",
+    "preview": "npm --prefix social-app run preview"
+  }
+}
