@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 font-body antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  @apply font-display tracking-tight;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300 dark:bg-slate-700;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white/90 shadow-soft backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-none;
+  }
+
+  .input-base {
+    @apply w-full rounded-xl border border-transparent bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:bg-slate-900 dark:focus:ring-brand-500/20;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-slate-900 dark:text-slate-50;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+
+  .muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .surface {
+    @apply bg-white dark:bg-slate-900;
+  }
+
+  .surface-muted {
+    @apply bg-slate-50 dark:bg-slate-800/60;
+  }
+
+  .divider {
+    @apply border-slate-200 dark:border-slate-800;
+  }
+}

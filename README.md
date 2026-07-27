@@ -1,11 +1,14 @@
-# SocialApp — Facebook-Inspired Social Media Platform
+# Social Collaboration (SocialApp) — Assignment 1 + 2
 
-A frontend-only social media app built with React — sign up, post, like, comment, and manage a profile, all persisted in your browser's `localStorage`.
+**Repository:** [safinafatima61-gif/social-app-safina-fatima](https://github.com/safinafatima61-gif/social-app-safina-fatima)  
+**Branch for this work:** `assignment-2`
+
+A frontend-only social networking app built with React (Vite). Assignment 1 covers auth, feed, posts, and profiles. Assignment 2 adds friends, real-time chat, and OpenAI-powered AI features. Data lives in the browser `localStorage` (session login is per-tab via `sessionStorage`).
 
 ## 1. Live Demo
 
-> Deploy to [Vercel](https://vercel.com) or [Netlify](https://netlify.com) and put your live link here:
-> **Live Demo:** https://connect-circle-919.lovable.app/auth
+> **Live Demo (Vercel):** _will be updated after deployment_  
+> Previous demo: https://connect-circle-919.lovable.app/auth
 
 ## 2. Screenshots
 
@@ -500,3 +503,127 @@ The goal of SocialApp is to recreate the core experience of Facebook using moder
 
 > **SocialApp — A Modern Facebook-Inspired Social Networking Platform built with React, 
 Tailwind CSS, Context API, React Router, and localStorage.**
+
+---
+
+# Assignment 2 Features
+
+Built on top of Assignment 1. Three major add-ons:
+
+## 1. Friend System
+- **People You May Know** (`/people`) — discover users, sorted by incoming → none → outgoing
+- **Friend Requests** (`/requests`) — Received / Sent tabs with Accept, Reject, Cancel
+- **Friends List** (`/friends`) — Message + Unfriend, empty state links to People
+- Profile relationship buttons: Add Friend / Request Sent / Accept+Reject / Message+Unfriend
+- Navbar bell badge for pending received requests
+
+## 2. Real-Time Chat
+- Messenger UI at `/chat` and `/chat/:userId` (friends only)
+- Text, image, and video messages with FileReader preview before send
+- Cross-tab real-time via `localStorage` + `storage` event (no WebSockets)
+- AI reply chips, AI auto-reply mode, typing indicator, online status
+
+## 3. AI Integration (OpenAI `gpt-4o-mini`)
+- Post writing assistant (Create / Edit Post)
+- Suggest Comment on Post Detail
+- Optimise Bio on Profile Settings
+- Chat Mode 1: 3 reply suggestion chips
+- Chat Mode 2: AI replies on your behalf (opt-in only)
+
+### Bonus features included
+1. Message read receipts (`✓` / `✓✓`)
+2. Emoji reactions on messages
+3. Message search in chat (Esc to close)
+4. AI chat personality (Friendly / Professional / Casual / Funny)
+5. Mutual friends count on People cards
+
+---
+
+# AI Features
+
+All AI calls go through `src/hooks/useAI.js` using the shared client in `src/lib/openai.js`.
+
+| Feature | Where | Behaviour |
+|---------|-------|-----------|
+| Post generation | Create/Edit Post | Collapsible panel → generate → Use This Content |
+| Comment suggest | Post Detail | Fills comment input; user still clicks Post |
+| Bio optimise | Profile Settings | Suggestion card under 150 chars |
+| Chat chips | Chat | 3 chips after friend message (fail silently) |
+| Auto-reply | Chat header AI menu | 1–2s delay, ✨ sparkle on AI messages |
+
+Always: `model: 'gpt-4o-mini'`, `max_tokens: 300`, loading states, try/catch error handling.
+
+---
+
+# Real-Time Chat Architecture
+
+There is **no backend and no WebSocket**. Real-time works like this:
+
+1. Tab A sends a message → writes the `messages` array to `localStorage`
+2. Tab B (same origin) receives the browser `storage` event
+3. The listener in `ChatContext` re-reads messages and updates React state
+4. The UI refreshes instantly without a page reload
+
+`conversationId` is always `[userId1, userId2].sort().join('_')` so A→B and B→A share one thread.
+
+Cleanup: every `useEffect` that adds a listener returns `removeEventListener`.
+
+---
+
+# How to Set Up the API Key
+
+> **Note:** The `.env` file is **not** committed to GitHub. You must add your own OpenAI key to use AI features. Friends + Chat work without a key.
+
+1. Open the project folder: `social-app/`
+2. Copy `.env.example` to `.env`
+3. Paste your key:
+
+```env
+VITE_OPENAI_API_KEY=sk-your-key-here
+```
+
+4. Install and run:
+
+```bash
+cd social-app
+npm install
+npm run dev
+```
+
+5. Restart the dev server whenever you change `.env`
+
+---
+
+# Assignment 2 Screenshots
+
+> Add these after running the app (replace placeholders with real images):
+
+```
+![People page](./screenshots/people.png)
+![Chat with AI chips](./screenshots/chat-ai-chips.png)
+![AI post generation](./screenshots/ai-post.png)
+![AI auto-reply mode](./screenshots/ai-auto-reply.png)
+```
+
+| People | Chat + AI chips |
+|--------|-----------------|
+| ![People](./screenshots/people.png) | ![Chat](./screenshots/chat-ai-chips.png) |
+
+| AI Post | AI Auto-reply |
+|---------|---------------|
+| ![AI Post](./screenshots/ai-post.png) | ![Auto-reply](./screenshots/ai-auto-reply.png) |
+
+---
+
+# New localStorage Keys (Assignment 2)
+
+```js
+// friendRequests
+[{ id, fromUserId, toUserId, status, sentAt, respondedAt }]
+
+// messages
+[{ id, conversationId, senderId, receiverId, type, content, timestamp, read, aiGenerated, reactions }]
+
+// aiSettings
+{ [userId]: { aiChatEnabled, aiMode, aiPersonality } }
+```

@@ -1,9 +1,7 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
 import RequireAuth from './components/RequireAuth';
-import { storage } from './utils/storage';
 
 const FeedPage = lazy(() => import('./pages/FeedPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -11,7 +9,12 @@ const SignupPage = lazy(() => import('./pages/SignupPage'));
 const PostDetailPage = lazy(() => import('./pages/PostDetailPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-const DashboardLayout = lazy(() => import('./pages/dashboard/DashboardLayout'));
+const PeoplePage = lazy(() => import('./pages/PeoplePage'));
+const FriendRequestsPage = lazy(() => import('./pages/FriendRequestsPage'));
+const FriendsPage = lazy(() => import('./pages/FriendsPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
+const AdminDashboard = lazy(() => import('./pages/dashboard/AdminDashboard'));
 const PostsDashboard = lazy(() => import('./pages/dashboard/PostsDashboard'));
 const CreatePost = lazy(() => import('./pages/dashboard/CreatePost'));
 const EditPost = lazy(() => import('./pages/dashboard/EditPost'));
@@ -26,43 +29,42 @@ function Spinner() {
 }
 
 export default function App() {
-  // Apply saved theme on first load so it doesn't flash light-mode.
-  useEffect(() => {
-    const theme = storage.getTheme();
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-  }, []);
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar />
-      <div className="flex-1">
-        <Suspense fallback={<Spinner />}>
-          <Routes>
-            <Route path="/" element={<FeedPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/posts/:postId" element={<PostDetailPage />} />
-            <Route path="/profile/:userId" element={<ProfilePage />} />
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
-            <Route
-              path="/dashboard"
-              element={
-                <RequireAuth>
-                  <DashboardLayout />
-                </RequireAuth>
-              }
-            >
-              <Route path="posts" element={<PostsDashboard />} />
-              <Route path="create" element={<CreatePost />} />
-              <Route path="edit/:postId" element={<EditPost />} />
-              <Route path="settings" element={<ProfileSettings />} />
-            </Route>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<FeedPage />} />
+          <Route path="/posts/:postId" element={<PostDetailPage />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} />
+          <Route path="/people" element={<PeoplePage />} />
+          <Route path="/requests" element={<FriendRequestsPage />} />
+          <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:userId" element={<ChatPage />} />
 
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
-      </div>
-      <Footer />
-    </div>
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <DashboardLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="posts" element={<PostsDashboard />} />
+            <Route path="create" element={<CreatePost />} />
+            <Route path="edit/:postId" element={<EditPost />} />
+            <Route path="settings" element={<ProfileSettings />} />
+          </Route>
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

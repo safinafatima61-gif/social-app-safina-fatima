@@ -20,47 +20,67 @@ A frontend-only social media app built with React — sign up, post, like, comme
 
 - **React (Vite)** — frontend framework and build tool
 - **React Router v6** — routing, dynamic routes, protected routes
-- **Tailwind CSS** — utility-first styling, dark mode
+- **Tailwind CSS** — utility-first styling
 - **React Hook Form** — all forms with validation
 - **Context API** — auth state (`AuthContext`)
-- **localStorage** — all data storage (users, posts, comments, likes)
+- **localStorage** — users, posts, comments, likes, friendRequests, messages, aiSettings
+- **OpenAI API (`gpt-4o-mini`)** — AI post, comment, profile, and chat features
 - **clsx** — conditional class names
 - **React.lazy + Suspense** — code-split pages
 
-## 4. Features
+## 4. Features (Assignment 1)
 
 - Signup with validation (name, email, password strength, confirm password)
 - Login / logout, session persists across page refresh
-- Public feed of posts, sorted newest first, with an empty state
+- Public feed of posts with inline create-post composer
 - Guests are redirected to `/login` when they try to like or comment
 - Create posts with image upload + live preview, save as draft or publish
-- Character counter on the post description (turns orange/red near the limit)
-- Edit and delete your own posts; toggle a post between public/private
-- Publish drafts from the dashboard with one click
-- Post detail page — like/unlike, add comments, delete your own comments (inline confirm, no `confirm()`)
-- Public profile pages with cover image, avatar, bio, location, joined date
-- Profile settings — update name, bio (150-char counter), location, avatar — reflects instantly in the navbar
-- Protected dashboard routes (`RequireAuth`) — redirect to `/login` if not authenticated
-- **Bonus:** live search on the Feed page, dark mode toggle (persisted), post description character counter,
- image preview before upload, delete-own-comment with inline confirmation
+- Edit and delete your own posts; toggle public/private
+- Post detail page — like/unlike, comments
+- Public profile pages with cover image, avatar, bio
+- Protected dashboard routes (`RequireAuth`)
+- Admin dashboard for the first registered user
+
+## 4b. Assignment 2 Features
+
+### Friend System
+- People You May Know (`/people`) with correct sorting and mutual friends count
+- Friend requests send / accept / reject / cancel (`/requests`)
+- Friends list with Message + Unfriend (`/friends`)
+- Profile relationship buttons (Add Friend, Request Sent, Accept/Reject, Message/Unfriend)
+- Navbar request-count badge
+
+### Real-Time Chat
+- Chat home + conversation panel (`/chat`, `/chat/:userId`)
+- Text, image, and video messages with preview before send
+- Real-time sync across browser tabs via `storage` event (no WebSockets)
+- AI suggestion chips + optional AI auto-reply mode
+- Bonus: read receipts (✓ / ✓✓), emoji reactions, message search, AI personality
+
+### AI Integration
+- AI Writing Assistant on Create/Edit Post
+- Suggest Comment on Post Detail
+- Optimise Bio on Profile Settings
+- Chat reply suggestions (Mode 1) and auto-reply (Mode 2)
 
 ## 5. How to Run Locally
 
-```bash
-git clone https://github.com/<your-username>/social-app-<your-name>.git
-cd social-app-<your-name>
+```powershell
+cd "social-app"
 npm install
 npm run dev
 ```
 
-Then open the URL Vite prints (usually `http://localhost:5173`).
+Open the URL Vite prints (usually `http://localhost:5173`).
 
-To build for production:
+### How to Set Up the OpenAI API Key
 
-```bash
-npm run build
-npm run preview
-```
+1. Copy `.env.example` to `.env` in the `social-app` folder
+2. Add your key: `VITE_OPENAI_API_KEY=sk-your-key-here`
+3. Restart `npm run dev`
+4. **Never commit `.env`** — it is already listed in `.gitignore`
+
+> Note: AI features require a valid OpenAI API key. Without it, the rest of the app still works; AI buttons show a setup hint.
 
 ## 6. Folder Structure
 
@@ -68,36 +88,36 @@ npm run preview
 social-app/
 ├── public/
 ├── src/
+│   ├── assets/
 │   ├── components/
-│   │   ├── layout/       (Navbar, Footer)
-│   │   ├── post/         (PostCard, PostForm, PostActions, CommentSection)
-│   │   ├── profile/      (ProfileHeader)
-│   │   ├── ui/           (Button, Input, Modal, Avatar, Badge)
+│   │   ├── ai/           (AIPostAssistant, AICommentSuggest, AIProfileOptimize)
+│   │   ├── chat/         (ConversationList, MessageBubble, MessageInput, ...)
+│   │   ├── feed/         (CreatePostComposer, PeopleSidebar)
+│   │   ├── friends/      (FriendRequestCard, FriendCard, RequestBadge)
+│   │   ├── icons/
+│   │   ├── post/
+│   │   ├── profile/
+│   │   ├── ui/
 │   │   └── RequireAuth.jsx
-│   ├── context/
-│   │   └── AuthContext.jsx
-│   ├── hooks/
-│   │   ├── useAuth.js
-│   │   ├── useLocalStorage.js
-│   │   └── usePosts.js
-│   ├── pages/
-│   │   ├── FeedPage.jsx, LoginPage.jsx, SignupPage.jsx
-│   │   ├── PostDetailPage.jsx, ProfilePage.jsx, NotFoundPage.jsx
-│   │   └── dashboard/
-│   │       ├── DashboardLayout.jsx, PostsDashboard.jsx
-│   │       ├── CreatePost.jsx, EditPost.jsx, ProfileSettings.jsx
-│   ├── utils/
-│   │   ├── storage.js    (all localStorage helpers)
-│   │   └── helpers.js    (generateId, formatDate, readFileAsBase64)
+│   ├── context/          (AuthContext)
+│   ├── hooks/            (useAuth, usePosts, useFriends, useChat, useAI, ...)
+│   ├── layouts/          (MainLayout, AuthLayout, Navbar, Footer, DashboardLayout)
+│   ├── lib/              (openai.js)
+│   ├── pages/            (Feed, Auth, Profile, People, Friends, Chat, dashboard/...)
+│   ├── services/         (storage.js)
+│   ├── styles/           (index.css)
+│   ├── utils/            (helpers, friendHelpers, chatHelpers)
 │   ├── App.jsx
 │   └── main.jsx
+├── .env.example
+└── package.json
 ```
 
 ## 7. localStorage Data Structure
 
 ```js
 // Key: 'users'
-[{ id, name, email, password, bio, location, avatar, coverImage, joinedAt }]
+[{ id, name, email, password, bio, location, avatar, coverImage, role, lastSeen, joinedAt }]
 
 // Key: 'posts'
 [{ id, authorId, description, image, isPublic, isDraft, createdAt, updatedAt }]
@@ -108,15 +128,25 @@ social-app/
 // Key: 'likes'
 [{ id, postId, userId, createdAt }]
 
-// Key: 'currentUser' — the logged-in user (password stripped)
-// Key: 'theme' — 'light' | 'dark'
+// Key: 'friendRequests'
+[{ id, fromUserId, toUserId, status, sentAt, respondedAt }]
+
+// Key: 'messages'
+[{ id, conversationId, senderId, receiverId, type, content, timestamp, read, aiGenerated, reactions }]
+
+// Key: 'aiSettings'
+{ [userId]: { aiChatEnabled, aiMode, aiPersonality } }
+
+// Key: 'currentUser' — logged-in user (password stripped)
 ```
 
-## 8. What I Learned
+## 8. Real-Time Chat Architecture
 
-> Write an honest paragraph here (minimum 5 sentences) about what you learned building this — React Router's nested/protected routes, Context 
-API for global auth state, structuring localStorage as a fake backend, React Hook Form validation patterns, and organizing reusable components/hooks 
-so the codebase stays clean.
+Chat does **not** use WebSockets. When Tab A writes to `localStorage` key `messages`, Tab B receives a browser `storage` event, re-reads messages, and updates React state. Cleanup uses `removeEventListener` in the `useEffect` return. `getConversationId` sorts both user IDs so A→B and B→A share one thread.
+
+## 9. AI Features
+
+All AI calls go through `src/lib/openai.js` + `useAI` hook using `gpt-4o-mini` with `max_tokens: 300`. Errors are caught and shown as inline messages/toasts — they never crash the UI. Mode 2 auto-reply is off by default and must be enabled from the chat AI menu.
 
 ## 9. Known Limitations
 

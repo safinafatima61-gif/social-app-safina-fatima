@@ -1,5 +1,5 @@
 import { createContext, useState } from 'react';
-import { storage, generateId } from '../utils/storage';
+import { storage, generateId, ensureDemoUsers } from '../services/storage';
 
 export const AuthContext = createContext(null);
 
@@ -9,15 +9,36 @@ function stripPassword(user) {
   return safe;
 }
 
+function ensureRoles(users) {
+  if (!users.length) return users;
+  let changed = false;
+  const next = users.map((u, index) => {
+    if (u.role) return u;
+    changed = true;
+    return { ...u, role: index === 0 ? 'admin' : 'user' };
+  });
+  if (changed) storage.setUsers(next);
+  return next;
+}
+
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(() => storage.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState(() => {
+    ensureDemoUsers();
+    const users = ensureRoles(storage.getUsers());
+    const session = storage.getCurrentUser();
+    if (!session) return null;
+    const fresh = users.find((u) => u.id === session.id);
+    return fresh ? stripPassword(fresh) : session;
+  });
 
   function signup({ name, email, password }) {
+    ensureDemoUsers();
     const users = storage.getUsers();
     const exists = users.some((u) => u.email.toLowerCase() === email.toLowerCase());
     if (exists) {
       throw new Error('Email already registered');
     }
+
     const newUser = {
       id: generateId('usr'),
       name,
@@ -25,16 +46,26 @@ export function AuthProvider({ children }) {
       password,
       bio: '',
       location: '',
+      education: '',
+      skills: [],
+      socialLinks: { website: '', twitter: '', linkedin: '', github: '' },
       avatar: null,
       coverImage: null,
+      role: users.length === 0 ? 'admin' : 'user',
       joinedAt: new Date().toISOString(),
     };
+
     storage.setUsers([...users, newUser]);
-    return stripPassword(newUser);
+    const safeUser = stripPassword(newUser);
+    // Auto-login this tab after signup
+    setCurrentUser(safeUser);
+    storage.setCurrentUser(safeUser);
+    return safeUser;
   }
 
   function login(email, password) {
-    const users = storage.getUsers();
+    ensureDemoUsers();
+    const users = ensureRoles(storage.getUsers());
     const found = users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
     );
@@ -72,6 +103,7 @@ export function AuthProvider({ children }) {
     logout,
     updateCurrentUser,
     isAuthenticated: !!currentUser,
+    isAdmin: currentUser?.role === 'admin',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -8,18 +8,14 @@ const Input = forwardRef(function Input(
   return (
     <div className="w-full">
       {label && (
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
           {label}
         </label>
       )}
       <input
         ref={ref}
         type={type}
-        className={clsx(
-          'input-base',
-          error && 'border-red-400 focus:ring-red-400',
-          className
-        )}
+        className={clsx('input-base', error && 'ring-2 ring-red-400', className)}
         {...rest}
       />
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}

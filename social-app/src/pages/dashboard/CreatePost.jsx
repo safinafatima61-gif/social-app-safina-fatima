@@ -19,7 +19,7 @@ export default function CreatePost() {
 
     if (isDraft) {
       setDraftSaved(true);
-      setFormKey((k) => k + 1); // reset form
+      setFormKey((k) => k + 1);
       setTimeout(() => setDraftSaved(false), 3000);
     } else {
       navigate('/');
@@ -28,9 +28,9 @@ export default function CreatePost() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-5 text-xl font-bold">Create Post</h1>
+      <h1 className="mb-5 text-xl font-bold text-slate-900 dark:text-slate-50">Create Post</h1>
       {draftSaved && (
-        <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-900/40">
+        <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
           Post saved as draft
         </p>
       )}

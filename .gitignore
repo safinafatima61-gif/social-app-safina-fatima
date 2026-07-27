@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build
+dist/
+**/dist/
+build/
+
+# Environment / secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+**/.env
+!**/.env.example
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor / tooling
+.vscode/
+.idea/
+*.swp
+.vercel
